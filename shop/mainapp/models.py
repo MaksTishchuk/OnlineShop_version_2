@@ -14,91 +14,11 @@ from io import BytesIO
 User = get_user_model()
 
 
-def get_product_url(obj, view_name):
-    ct_model = obj.__class__._meta.model_name
-    return reverse(view_name, kwargs={'ct_model': ct_model, 'slug': obj.slug})
-
-
-def get_models_for_count(*model_names):
-    return [models.Count(model_name) for model_name in model_names]
-
-
-class MinResolutionErrorException(Exception):
-    """Исключение, если изображение меньше заданных параметров"""
-    pass
-
-
-class MaxResolutionErrorException(Exception):
-    """Исключение, если изображение больше заданных параметров"""
-    pass
-
-
-class LatestProductsManager:
-    """Получение товаров для главной страницы"""
-
-    @staticmethod
-    def get_products_for_main_page(*args, **kwargs):
-        """Получаем последние 5 товаров моделей, которые были переданы в args.
-        В kwargs можно передать имя модели, предпочитаемой для сортировки в начало,
-        с помощью ключевого аргумента with_respect_to"""
-
-        products = []
-        with_respect_to = None
-        ct_models = ContentType.objects.filter(model__in=args)
-        for ct_model in ct_models:
-            model_products = ct_model.model_class()._base_manager.all().order_by('-id')[:5]
-            products.extend(model_products)
-        if kwargs.get('with_respect_to') in args:
-            with_respect_to = kwargs.get('with_respect_to')
-        if with_respect_to:
-            ct_model = ContentType.objects.filter(model=with_respect_to)
-            if ct_model.exists():
-                return sorted(
-                    products,
-                    key=lambda x: x.__class__._meta.model_name.startswith(with_respect_to),
-                    reverse=True
-                )
-
-        return products
-
-
-class LatestProducts:
-    """Модель со своим менеджером"""
-    objects = LatestProductsManager
-
-
-class CategoryManager(models.Manager):
-    """Менеджер для вывода категорий в сайдбар"""
-
-    CATEGORY_NAME_COUNT_NAME = {
-        'Ноутбуки': 'notebook__count',
-        'Смартфоны': 'smartphone__count'
-    }
-
-    def get_queryset(self):
-        return super().get_queryset()
-
-    def get_categories_for_left_sidebar(self):
-        """Получение списка категорий, юрл, количество товаров в категории для вывода в сайдбар"""
-        models = get_models_for_count('notebook', 'smartphone')
-        qs = list(self.get_queryset().annotate(*models))
-        data = [
-            dict(
-                name=category.name,
-                url=category.get_absolute_url(),
-                count=getattr(category,
-                              self.CATEGORY_NAME_COUNT_NAME[category.name])
-            ) for category in qs
-        ]
-        return data
-
-
 class Category(models.Model):
     """Модель категорий"""
 
     name = models.CharField(max_length=255, verbose_name='Имя категории')
     slug = models.SlugField(unique=True)
-    objects = CategoryManager()
 
     def __str__(self):
         return self.name
@@ -108,13 +28,7 @@ class Category(models.Model):
 
 
 class Product(models.Model):
-    """Каркас товара - абстрактная модель"""
-
-    MAX_RESOLUTION = (512, 512)
-    MAX_IMAGE_SIZE = 3145728
-
-    class Meta:
-        abstract = True
+    """Модель товаров"""
 
     category = models.ForeignKey(Category, verbose_name='Категория', on_delete=models.CASCADE)
     title = models.CharField(max_length=255, verbose_name='Наименование')
@@ -126,65 +40,12 @@ class Product(models.Model):
     def __str__(self):
         return self.title
 
-    def save(self, *args, **kwargs):
-        """ В метод добавили приведение изображения к нужному размеру, которое не превышает заданного максимального"""
-        image = self.image
-        img = Image.open(image)
-        new_img = img.convert('RGB')
-        new_img.thumbnail([*self.MAX_RESOLUTION], Image.ANTIALIAS)
-        filestream = BytesIO()
-        new_img.save(filestream, 'JPEG', quality=90)
-        filestream.seek(0)
-        self.image = InMemoryUploadedFile(
-            filestream, 'ImageField',
-            self.image.name,
-            'jpeg/image',
-            sys.getsizeof(filestream),
-            None
-        )
-        super().save(*args, **kwargs)
-
-    def get_absolute_url(self):
-        return get_product_url(self, 'product_detail')
-
     def get_model_name(self):
         """Получаем имя модели товара"""
         return self.__class__.__name__.lower()
 
-
-class Notebook(Product):
-    """Модель для товаров ноутбуков"""
-
-    diagonal = models.CharField(max_length=255, verbose_name='Диагональ')
-    display_type = models.CharField(max_length=255, verbose_name="Тип дисплея")
-    processor_freq = models.CharField(max_length=255, verbose_name='Частота процессора')
-    ram = models.CharField(max_length=255, verbose_name='Оперативная память')
-    video = models.CharField(max_length=255, verbose_name='Видеокарта')
-    time_without_charge = models.CharField(
-        max_length=255, verbose_name='Время работы от аккумулятора'
-    )
-
-    def __str__(self):
-        return f'{self.category.name}: {self.title}'
-
-
-class Smartphone(Product):
-    """Модель для товаров смартфонов"""
-
-    diagonal = models.CharField(max_length=255, verbose_name='Диагональ')
-    display_type = models.CharField(max_length=255, verbose_name="Тип дисплея")
-    resolution = models.CharField(max_length=255, verbose_name="Разрешение экрана")
-    accum_volume = models.CharField(max_length=255, verbose_name="Емкость аккумулятора")
-    ram = models.CharField(max_length=255, verbose_name='Оперативная память')
-    sd = models.BooleanField(default=True, verbose_name='Наличие SD карты')
-    sd_volume_max = models.CharField(
-        max_length=255, null=True, blank=True, verbose_name='Максимальный объем micro sd карты'
-    )
-    main_cam_mp = models.CharField(max_length=255, verbose_name='Основная камера')
-    frontal_cam_mp = models.CharField(max_length=255, verbose_name='Фронтальная камера')
-
-    def __str__(self):
-        return f'{self.category.name}: {self.title}'
+    def get_absolute_url(self):
+        return reverse('product_detail', kwargs={'slug': self.slug})
 
 
 class CartProduct(models.Model):
@@ -194,9 +55,7 @@ class CartProduct(models.Model):
     cart = models.ForeignKey(
         'Cart', verbose_name='Корзина', on_delete=models.CASCADE, related_name='related_products'
     )
-    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
-    object_id = models.PositiveIntegerField()
-    content_object = GenericForeignKey('content_type', 'object_id')
+    product = models.ForeignKey(Product, verbose_name='Товар', on_delete=models.CASCADE)
     qty = models.PositiveSmallIntegerField(default=1)  # Количество товара
     final_price = models.DecimalField(
         max_digits=9,
@@ -205,10 +64,10 @@ class CartProduct(models.Model):
         verbose_name='Финальная цена')
 
     def __str__(self):
-        return f'Продукт: {self.content_object.title} (для корзины)'
+        return f'Продукт: {self.product.title} (для корзины)'
 
     def save(self, *args, **kwargs):
-        self.final_price = self.qty * self.content_object.price
+        self.final_price = self.qty * self.product.price
         super().save(*args, **kwargs)
 
 

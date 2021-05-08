@@ -4,8 +4,8 @@ from django.http import HttpResponseRedirect
 from django.contrib import messages
 from django.contrib.contenttypes.models import ContentType
 from django.views.generic import DetailView, View
-from .models import Notebook, Smartphone, Category, LatestProducts, Customer, Cart, CartProduct
-from .mixins import CategoryMixin, CartMixin
+from .models import Category, Product, Customer, Cart, CartProduct
+from .mixins import CartMixin
 from .forms import OrderForm
 from .utils import recalc_cart
 
@@ -14,8 +14,8 @@ class BaseView(CartMixin, View):
     """Вывод товаров на главную страницу"""
 
     def get(self, request):
-        categories = Category.objects.get_categories_for_left_sidebar()
-        products = LatestProducts.objects.get_products_for_main_page('notebook', 'smartphone')
+        categories = Category.objects.all()
+        products = Product.objects.all()
         context = {
             'categories': categories,
             'products': products,
@@ -24,32 +24,23 @@ class BaseView(CartMixin, View):
         return render(request, 'base.html', context)
 
 
-class ProductDetailView(CartMixin, CategoryMixin, DetailView):
+class ProductDetailView(CartMixin, DetailView):
     """Выводим детальное представление для моделей, указанных в словаре CT_MODEL_MODEL_CLASS.
-    В методе Диспатч достаем ловеркейс название контенттайп модели и через словарь достаем правильное название модели"""
+    В методе Диспатч достаем ловеркейс название контенттайп модели и
+    через словарь достаем правильное название модели"""
 
-    CT_MODEL_MODEL_CLASS = {
-        'notebook': Notebook,
-        'smartphone': Smartphone
-    }
-
-    def dispatch(self, request, *args, **kwargs):
-        self.model = self.CT_MODEL_MODEL_CLASS[kwargs['ct_model']]
-        self.queryset = self.model._base_manager.all()
-        return super().dispatch(request, *args, **kwargs)
-
+    model = Product
     context_object_name = 'product'
     template_name = 'product_detail.html'
     slug_url_kwarg = 'slug'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['ct_model'] = self.model._meta.model_name
         context['cart'] = self.cart
         return context
 
 
-class CategoryDetailView(CartMixin, CategoryMixin, DetailView):
+class CategoryDetailView(CartMixin, DetailView):
     """Вывод товаров в определенной категории"""
     model = Category
     queryset = Category.objects.all()
@@ -67,14 +58,12 @@ class AddToCartView(CartMixin, View):
     """Добавление товара в корзину"""
 
     def get(self, request, *args, **kwargs):
-        ct_model, product_slug = kwargs.get('ct_model'), kwargs.get('slug')
-        content_type = ContentType.objects.get(model=ct_model)  # Определяем модель этого товара
-        product = content_type.model_class().objects.get(slug=product_slug)  # получаем продукт
+        product_slug = kwargs.get('slug')
+        product = Product.objects.get(slug=product_slug)  # получаем продукт
         cart_product, created = CartProduct.objects.get_or_create(
             user=self.cart.owner,
             cart=self.cart,
-            content_type=content_type,
-            object_id=product.id
+            product=product
         )
         if created:
             self.cart.products.add(cart_product)
@@ -87,14 +76,12 @@ class DeleteFromCartView(CartMixin, View):
     """Удаляем товар из корзины"""
 
     def get(self, request, *args, **kwargs):
-        ct_model, product_slug = kwargs.get('ct_model'), kwargs.get('slug')
-        content_type = ContentType.objects.get(model=ct_model)  # Определяем модель этого товара
-        product = content_type.model_class().objects.get(slug=product_slug)  # получаем продукт
+        product_slug = kwargs.get('slug')
+        product = Product.objects.get(slug=product_slug)  # получаем продукт
         cart_product = CartProduct.objects.get(
             user=self.cart.owner,
             cart=self.cart,
-            content_type=content_type,
-            object_id=product.id
+            product=product
         )
         self.cart.products.remove(cart_product)
         cart_product.delete()
@@ -107,14 +94,12 @@ class ChangeQtyView(CartMixin, View):
     """Изменение количества товара в корзине"""
 
     def post(self, request, *args, **kwargs):
-        ct_model, product_slug = kwargs.get('ct_model'), kwargs.get('slug')
-        content_type = ContentType.objects.get(model=ct_model)  # Определяем модель этого товара
-        product = content_type.model_class().objects.get(slug=product_slug)  # получаем продукт
+        product_slug = kwargs.get('slug')
+        product = Product.objects.get(slug=product_slug)  # получаем продукт
         cart_product = CartProduct.objects.get(
             user=self.cart.owner,
             cart=self.cart,
-            content_type=content_type,
-            object_id=product.id
+            product=product
         )
         qty = int(request.POST.get('qty'))
         cart_product.qty = qty
@@ -128,7 +113,7 @@ class CartView(CartMixin, View):
     """Представление корзины"""
 
     def get(self, request, *args, **kwargs):
-        categories = Category.objects.get_categories_for_left_sidebar()
+        categories = Category.objects.all()
         context = {
             'cart': self.cart,
             'category': categories
@@ -140,7 +125,7 @@ class CheckoutView(CartMixin, View):
     """Представление формы создания заказа"""
 
     def get(self, request, *args, **kwargs):
-        categories = Category.objects.get_categories_for_left_sidebar()
+        categories = Category.objects.all()
         form = OrderForm(request.POST or None)
         context = {
             'cart': self.cart,
