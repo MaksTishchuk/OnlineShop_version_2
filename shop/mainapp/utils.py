@@ -7,5 +7,8 @@ def recalc_cart(cart):
         cart.final_price = cart_data['final_price__sum']
     else:
         cart.final_price = 0
-    cart.total_products = cart_data['qty__sum']
+    if cart_data.get('qty__sum'):
+        cart.total_products = cart_data['qty__sum']
+    else:
+        cart.total_products = 0
     cart.save()
