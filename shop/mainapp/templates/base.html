@@ -40,8 +40,28 @@ body {
             <span class="navbar-toggler-icon"></span>
         </button>
         <div class="collapse navbar-collapse" id="navbarResponsive">
-
-
+            <ul class="navbar-nav">
+                {% if not request.user.is_authenticated %}
+                <li>
+                    <a class="nav-link text-white" href="#">Авторизация</a>
+                </li>
+                <li>
+                    <a class="nav-link text-white" href="#">Регистрация</a>
+                </li>
+                {% else %}
+                <li class="nav-item">
+                    <span class="navbar-text text-light">
+                        Здравствуйте,
+                        <span class="badge badge-danger">
+                        <a href="#" style="text-decoration: none; font-size: 14px;">
+                            {{ request.user.username }}
+                        </a>
+                    </span>
+                        <a href="#">| Выйти</a>
+                    </span>
+                </li>
+                {% endif %}
+            </ul>
 
             <ul class="navbar-nav ml-auto">
                 <li class="nav-item">
@@ -64,6 +84,10 @@ body {
             <h1 class="my-4">MaksOnlineStore</h1>
             <div class="list-group">
 
+                {% for category in categories %}
+                <a href="{{ category.get_absolute_url }}" class="list-group-item">
+                    {{ category.name }} ({{ category.product_set.count }})</a>
+                {% endfor %}
 
             </div>
 
