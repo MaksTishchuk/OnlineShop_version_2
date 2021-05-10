@@ -43,21 +43,21 @@ body {
             <ul class="navbar-nav">
                 {% if not request.user.is_authenticated %}
                 <li>
-                    <a class="nav-link text-white" href="#">Авторизация</a>
+                    <a class="nav-link text-white" href="{% url 'login' %}">Авторизация</a>
                 </li>
                 <li>
-                    <a class="nav-link text-white" href="#">Регистрация</a>
+                    <a class="nav-link text-white" href="{% url 'registration' %}">Регистрация</a>
                 </li>
                 {% else %}
                 <li class="nav-item">
                     <span class="navbar-text text-light">
                         Здравствуйте,
-                        <span class="badge badge-danger">
+                        <span>
                         <a href="#" style="text-decoration: none; font-size: 14px;">
                             {{ request.user.username }}
                         </a>
                     </span>
-                        <a href="#">| Выйти</a>
+                        <a href="{% url 'logout' %}">| Выйти</a>
                     </span>
                 </li>
                 {% endif %}

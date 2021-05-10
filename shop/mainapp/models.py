@@ -108,7 +108,7 @@ class Customer(models.Model):
     )
 
     def __str__(self):
-        return f'Покупатель: {self.user} {self.user.last_name}'
+        return f'Покупатель: {self.user}'
 
 
 class Order(models.Model):
