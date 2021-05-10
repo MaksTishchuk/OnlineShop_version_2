@@ -40,6 +40,7 @@ INSTALLED_APPS = [
 
 
     'mainapp',
+    'specs',
     'crispy_forms',
 ]
 
