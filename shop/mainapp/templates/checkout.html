@@ -18,16 +18,16 @@
         <tr>
           <th scope="row">{{ item.product.title }}</th>
           <td class="w-25"><img src="{{ item.product.image.url }}" class="img-fluid"></td>
-          <td>{{ item.product.price }} руб.</td>
+          <td>{{ item.product.price }} грн.</td>
           <td>{{ item.qty }}</td>
-            <td>{{ item.final_price }} руб.</td>
+            <td>{{ item.final_price }} грн.</td>
         </tr>
     {% endfor %}
         <tr>
           <td colspan="2"></td>
           <td>Итого:</td>
           <td>{{ cart.total_products }}</td>
-          <td><strong>{{ cart.final_price }} руб.</strong></td>
+          <td><strong>{{ cart.final_price }} грн.</strong></td>
         </tr>
   </tbody>
 </table>
